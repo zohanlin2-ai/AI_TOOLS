@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BSP Prompt Harness</title>
+  <style>
+    :root { --ink:#19253a; --muted:#65728a; --line:#dfe6ef; --surface:#fff; --canvas:#f4f7fb; --blue:#2764d8; --blue-2:#eaf1ff; --warn:#9b5b00; --warn-bg:#fff6e8; }
+    * { box-sizing:border-box; } body { margin:0; font-family:Inter, "Noto Sans TC", system-ui, sans-serif; color:var(--ink); background:var(--canvas); }
+    header { background:linear-gradient(120deg,#172f62,#2764d8); color:#fff; padding:42px max(24px, calc((100vw - 1120px)/2)); }
+    header h1 { margin:0 0 8px; font-size:28px; letter-spacing:-.5px; } header p { margin:0; opacity:.86; }
+    main { max-width:1120px; margin:30px auto 52px; padding:0 24px; display:grid; gap:22px; }
+    .card { background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:24px; box-shadow:0 7px 24px #1a31500b; }
+    .top-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; } label { display:block; font-size:13px; font-weight:700; margin:0 0 7px; color:#34425a; }
+    input, select, textarea { width:100%; border:1px solid #cbd6e4; border-radius:9px; padding:10px 11px; color:var(--ink); font:inherit; background:#fff; }
+    input:focus, select:focus, textarea:focus { outline:3px solid #dce8ff; border-color:#5a8af0; } textarea { min-height:94px; resize:vertical; line-height:1.45; }
+    .fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; } .wide { grid-column:1/-1; }
+    .mode { display:flex; flex-wrap:wrap; gap:8px; } .mode button { border:1px solid #ccd8e7; border-radius:999px; padding:9px 13px; background:#fff; color:#40506a; font-weight:700; cursor:pointer; }
+    .mode button.active { color:#174da9; background:var(--blue-2); border-color:#8baef6; }
+    .drop { border:1.5px dashed #9cb2d0; border-radius:11px; padding:15px; color:var(--muted); background:#fafcff; text-align:center; transition:.15s; cursor:pointer; }
+    .drop.drag { background:#edf4ff; border-color:var(--blue); color:#174da9; } .drop strong { color:#2d4d81; } .files { margin:8px 0 0; padding:0; list-style:none; font-size:12px; color:#56647a; text-align:left; }
+    .check { display:flex; gap:8px; align-items:center; font-weight:500; font-size:13px; color:#40506a; } .check input { width:auto; }
+    .notice { border-left:4px solid #e5a63d; background:var(--warn-bg); color:#76500d; border-radius:7px; padding:12px 14px; font-size:13px; line-height:1.5; }
+    .actions { display:flex; align-items:center; gap:12px; flex-wrap:wrap; } .primary, .copy { border:0; background:var(--blue); color:#fff; border-radius:9px; padding:11px 16px; cursor:pointer; font-weight:800; font:inherit; } .copy { background:#edf3ff; color:#2256b4; border:1px solid #bdd1f6; }
+    #output { min-height:280px; font-family:"Cascadia Code",Consolas,monospace; font-size:13px; background:#111b2e; color:#e9f0fc; border-color:#111b2e; }
+    .small { font-size:12px; color:var(--muted); margin:0; } .hidden { display:none!important; }
+    @media (max-width:700px) { .top-grid,.fields { grid-template-columns:1fr; } .wide { grid-column:auto; } header { padding:30px 24px; } }
+  </style>
+</head>
+<body>
+  <header><h1>BSP Prompt Harness</h1><p>在本機整理資訊，產生可交給 Codex 或 Claude Code 的安全任務 prompt。</p></header>
+  <main>
+    <section class="card top-grid">
+      <div><label>Agent 目標格式</label><select id="agent"><option value="generic">通用 Coding Agent</option><option value="codex">Codex</option><option value="claude">Claude Code</option></select></div>
+      <div><label>工作類型</label><div class="mode" id="modes"><button class="active" data-mode="docker">1. Docker 建置</button><button data-mode="clone">2. 下載 BSP</button><button data-mode="patch">3. 套用 Patch</button><button data-mode="debug">4. Debug</button></div></div>
+    </section>
+
+    <section class="card">
+      <div class="fields" id="common">
+        <div><label>專案／BSP 名稱</label><input id="project" placeholder="例如 imx8mp-evk" /></div>
+        <div><label>Ubuntu 版本（可留白）</label><input id="ubuntu" placeholder="留白時依 BSP 名稱／文件推斷" /></div>
+        <div class="wide"><label>BSP 或專案路徑</label><input id="path" placeholder="/workspace/project 或本機路徑（僅作 prompt 參考）" /></div>
+      </div>
+    </section>
+
+    <section class="card" id="dockerFields">
+      <div class="fields"><div><label>Docker image 名稱</label><input id="image" placeholder="bsp-build:latest" /></div><div><label>Named volume 名稱</label><input id="volume" placeholder="bsp-imx8mp-evk" /></div><div class="wide"><label>額外建置需求（選填）</label><textarea id="dockerReq" placeholder="例如需要 arm gcc、Yocto、NXP SDK，或貼上 BSP README 片段"></textarea></div></div>
+    </section>
+
+    <section class="card hidden" id="cloneFields">
+      <div class="fields"><div class="wide"><label>Repository URL</label><input id="repo" placeholder="https://git.example.com/team/bsp.git" /></div><div><label>Branch / tag / revision</label><input id="revision" placeholder="main（可留白）" /></div><div><label>目標目錄（位於 volume）</label><input id="target" placeholder="/workspace/bsp" value="/workspace/bsp" /></div><div class="wide"><label class="check"><input type="checkbox" id="manifest" />這是 manifest repo（使用 repo init / repo sync），不是一般 git clone</label></div><div><label>Git 帳號（選填）</label><input id="username" autocomplete="off" placeholder="username" /></div><div><label>Git token／密碼（選填）</label><input id="secret" type="password" autocomplete="new-password" placeholder="建議使用可撤銷的 read-only token" /></div><div class="wide"><label class="check"><input type="checkbox" id="inlineSecret" />將帳密明文內嵌於產生的 prompt（高風險；預設只輸出 placeholder）</label></div><div class="wide"><label>Credential／BSP 設定檔（拖放任何檔案）</label><div class="drop" data-file-target="credentialFiles"><strong>拖放檔案到此，或點擊選擇</strong><br>文字檔會在本機讀取並摘錄；二進位檔只保留檔名。</div><input class="hidden" id="credentialFiles" type="file" multiple /><ul class="files" id="credentialList"></ul></div></div>
+      <div class="notice">帳密不會被此頁寫入磁碟或瀏覽器儲存空間。若勾選「明文內嵌」，它仍可能出現在 agent 對話、trace 或 shell 紀錄中；請優先使用短效、只讀 token。</div>
+    </section>
+
+    <section class="card hidden" id="patchFields"><div class="fields"><div><label>Patch 檔案路徑</label><input id="patchPath" placeholder="/workspace/input/fix.patch" /></div><div><label>套用目錄</label><input id="patchRoot" placeholder="/workspace/bsp" /></div><div class="wide"><label>Patch 檔（拖放或選擇）</label><div class="drop" data-file-target="patchFiles"><strong>拖放 .patch / .diff 檔案</strong><br>會把文字內容列入 prompt。</div><input class="hidden" id="patchFiles" type="file" multiple accept=".patch,.diff,text/plain"/><ul class="files" id="patchList"></ul></div></div></section>
+
+    <section class="card hidden" id="debugFields"><div class="fields"><div class="wide"><label>問題描述（選填）</label><textarea id="debugText" placeholder="描述預期行為、實際錯誤與最近變更"></textarea></div><div class="wide"><label>Debug log（拖放或選擇）</label><div class="drop" data-file-target="logFiles"><strong>拖放 log、txt、輸出檔</strong><br>文字內容會加入 prompt（每檔最多 40,000 字元）。</div><input class="hidden" id="logFiles" type="file" multiple/><ul class="files" id="logList"></ul></div></div></section>
+
+    <section class="card"><div class="actions"><button class="primary" id="generate">產生 Prompt</button><button class="copy" id="copy">複製</button><span class="small" id="status">所有內容只在此瀏覽器分頁內處理。</span></div></section>
+    <section class="card"><label for="output">產生的 prompt</label><textarea id="output" spellcheck="false" placeholder="填入需求後按「產生 Prompt」"></textarea></section>
+  </main>
+  <script>
+    const $ = id => document.getElementById(id);
+    let mode = 'docker'; const fileText = { credential:'', patch:'', log:'' };
+    const map = { docker:'dockerFields', clone:'cloneFields', patch:'patchFields', debug:'debugFields' };
+    document.querySelectorAll('#modes button').forEach(b => b.onclick = () => { mode=b.dataset.mode; document.querySelectorAll('#modes button').forEach(x=>x.classList.toggle('active',x===b)); Object.entries(map).forEach(([k,id])=>$(id).classList.toggle('hidden',k!==mode)); });
+    function esc(s){ return (s||'').trim(); }
+    async function handleFiles(input, type, list) { const files=[...input.files]; const out=[]; let text=''; for (const f of files) { out.push(`<li>${f.name} · ${(f.size/1024).toFixed(1)} KB</li>`); const textLike=/^(text\/|application\/(json|xml|yaml|x-yaml|toml|javascript))/i.test(f.type)||/\.(txt|log|patch|diff|md|yml|yaml|json|conf|ini)$/i.test(f.name); if(textLike && f.size < 2_000_000) { try { text += `\n\n--- ${f.name} ---\n`+(await f.text()).slice(0,40000); } catch {} } else text += `\n\n--- ${f.name} ---\n[未讀取：非文字檔或檔案過大]`; } fileText[type]=text; $(list).innerHTML=out.join(''); }
+    document.querySelectorAll('.drop').forEach(drop => { const input=$(drop.dataset.fileTarget); const type=input.id.startsWith('credential')?'credential':input.id.startsWith('patch')?'patch':'log'; const list=type+'List'; drop.onclick=()=>input.click(); input.onchange=()=>handleFiles(input,type,list); ['dragenter','dragover'].forEach(e=>drop.addEventListener(e,x=>{x.preventDefault();drop.classList.add('drag')})); ['dragleave','drop'].forEach(e=>drop.addEventListener(e,x=>{x.preventDefault();drop.classList.remove('drag')})); drop.addEventListener('drop',e=>{input.files=e.dataTransfer.files;handleFiles(input,type,list)}); });
+    function header(){ const a=$('agent').value; const profile=a==='codex'?'Codex：遵守 sandbox／approval 規則，完成後回報可驗證結果。':a==='claude'?'Claude Code：先讀取專案規則（例如 CLAUDE.md），使用最小必要工具並回報驗證結果。':'通用 Coding Agent：先檢查環境，再依序執行，避免未經確認的破壞性操作。'; return `你是資深 BSP／Embedded Linux 工程師。${profile}\n\n共同限制：\n- 所有作業在 Docker Ubuntu container 內完成，container 必須以 --rm 執行；container filesystem 不可作為持久化空間。\n- 每個專案僅使用一個 named Docker volume；持久資料僅能放在該 volume 的 /workspace。\n- 不要修改 host、不要使用 privileged mode、不要將 secret 寫入 image、volume、Git remote URL、shell history、log 或 commit。\n- 先提出計畫與前置檢查；有不確定資訊時先說明假設，僅在必要時詢問。\n\n`; }
+    function context(){ return `專案／BSP：${esc($('project').value)||'[未提供]'}\nUbuntu：${esc($('ubuntu').value)||'未指定；請從 BSP 名稱、README、release notes、build scripts 或 metadata 推斷相容版本，無法判斷時選擇受支援的 LTS 並明確說明。'}\nBSP／專案路徑：${esc($('path').value)||'/workspace'}\n`; }
+    function prompt(){ let p=header()+context(); if(mode==='docker'){ p+=`\n任務：建立適合此 BSP 編譯的 Docker Ubuntu image。\nImage：${esc($('image').value)||'bsp-build:latest'}\nNamed volume：${esc($('volume').value)||'bsp-'+(esc($('project').value)||'project')}\n額外需求／文件片段：\n${esc($('dockerReq').value)||'[無]'}\n\n請執行：\n1. 檢查 BSP 文件與版本線索，判斷 Ubuntu 版本、必需套件、locale、工具鏈與非 root 使用者需求。\n2. 產出可重現的 Dockerfile（不要 COPY credentials），說明每個依賴的理由。\n3. 建立 named volume，並提供 docker run --rm 指令，把 volume 掛載至 /workspace。\n4. 在 container 中執行最小 smoke test（工具版本、目錄權限、必要命令），不要在 image 或 volume 放入 secret。\n5. 回報 Dockerfile、build/run 指令、驗證結果與任何需使用者確認的相容性風險。`; }
+      if(mode==='clone'){ const inline=$('inlineSecret').checked; const u=esc($('username').value), s=esc($('secret').value); const cred=inline&&s?`帳號：${u||'[未提供]'}\nToken／密碼：${s}`:`帳號：${u||'${GIT_USERNAME}'}\nToken／密碼：${s?'${GIT_TOKEN}（使用者已提供，請在執行時安全注入）':'${GIT_TOKEN}'} `; p+=`\n任務：在既有的 --rm Docker container 內，將 BSP 下載至 named volume 的 /workspace。\nRepository：${esc($('repo').value)||'[未提供]'}\nRevision：${esc($('revision').value)||'預設分支'}\n目的地：${esc($('target').value)||'/workspace/bsp'}\n類型：${$('manifest').checked?'manifest repo：使用 repo init / repo sync，並在開始前確認 manifest URL、branch 與 manifest name。':'一般 Git repository：使用 git clone。'}\nCredential：\n${cred}\n附加檔案內容（可能是 credential 或 BSP 設定，先判斷格式再使用）：${fileText.credential||'[無]'}\n\n請執行：\n1. 先確認 volume 已掛載到 /workspace，目的地不可覆蓋不明既有資料。\n2. 僅使用一次性的安全 credential 注入方式（環境變數或短生命週期 GIT_ASKPASS）；禁止 echo secret、禁止將 secret 寫進 URL/.git/config/volume。\n3. ${$('manifest').checked?'安裝 repo 工具後執行 repo init 與 repo sync；':'執行 git clone，checkout 指定 revision；'}驗證 remote、revision 與工作樹狀態。\n4. 清除所有暫存 credential，回報下載目錄、commit SHA、容量與驗證結果；不得在回覆中重新列印 secret。`; }
+      if(mode==='patch'){ p+=`\n任務：安全地評估並套用 BSP patch。\nBSP root：${esc($('patchRoot').value)||esc($('path').value)||'/workspace/bsp'}\nPatch 路徑：${esc($('patchPath').value)||'[請從附件判斷]'}\nPatch 內容：${fileText.patch||'[未提供檔案內容]'}\n\n請執行：\n1. 確認 repository root、目前 branch/commit、git status，且不可覆蓋既有未提交變更。\n2. 先用 git apply --check（必要時檢查 patch -p 層級）；說明衝突或版本不相容，不要強制套用。\n3. 通過檢查才套用 patch，列出變更檔案與 git diff --check 結果。\n4. 依 BSP 可用工具進行最小相關 build／lint／config 驗證；回報結果與 rollback 指令。`; }
+      if(mode==='debug'){ p+=`\n任務：分析 BSP／專案的 debug 問題，先建立證據鏈，再提出最小修正。\n問題描述：\n${esc($('debugText').value)||'[未提供]'}\nLog／附件：${fileText.log||'[未提供]'}\n\n請執行：\n1. 不臆測；從 log 擷取第一個根本錯誤、失敗階段、相關檔案與環境線索。\n2. 檢查 BSP／專案文件、build config、git 狀態及相符原始碼，提出按可能性排序的根因。\n3. 對每個假設給出最小且可逆的驗證命令；不修改檔案直到已有足夠證據。\n4. 若提出修正，限定在必要範圍，執行相關測試／build，並回報根因、修改、驗證、剩餘風險。`; } return p; }
+    $('generate').onclick=()=>{ $('output').value=prompt(); $('status').textContent='Prompt 已產生；內容僅存在目前分頁。'; };
+    $('copy').onclick=async()=>{ if(!$('output').value) $('output').value=prompt(); try { await navigator.clipboard.writeText($('output').value); $('status').textContent='已複製到剪貼簿。'; } catch { $('output').select(); document.execCommand('copy'); $('status').textContent='已複製到剪貼簿。'; } };
+  </script>
+</body>
+</html>
