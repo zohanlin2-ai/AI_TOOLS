@@ -1,0 +1,47 @@
+<Window x:Class="AiTerminal.Views.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="AI Terminal - Connection" Height="540" Width="620" ResizeMode="NoResize" WindowStartupLocation="CenterScreen">
+  <Grid Margin="20">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+      <TextBlock Text="Connection type:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+      <RadioButton x:Name="SerialRadio" Content="Serial (COM Port)" IsChecked="True" Checked="ConnectionTypeChanged"/>
+      <RadioButton x:Name="SshRadio" Content="SSH" Margin="22,0,0,0" Checked="ConnectionTypeChanged"/>
+    </StackPanel>
+    <Grid Grid.Row="1">
+      <Grid.ColumnDefinitions><ColumnDefinition Width="130"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+      </Grid.RowDefinitions>
+      <TextBlock Grid.Row="0" Text="COM Port:" VerticalAlignment="Center"/>
+      <ComboBox x:Name="PortBox" Grid.Row="0" Grid.Column="1" MinWidth="210"/>
+      <Button Grid.Row="0" Grid.Column="2" Content="Rescan" Margin="10,0,0,0" Click="RescanPorts"/>
+      <TextBlock Grid.Row="1" Text="Baud rate:" VerticalAlignment="Center" Margin="0,12,0,0"/>
+      <ComboBox x:Name="BaudBox" Grid.Row="1" Grid.Column="1" Margin="0,12,0,0" IsEditable="True" Text="115200">
+        <ComboBoxItem Content="9600"/><ComboBoxItem Content="115200"/><ComboBoxItem Content="921600"/>
+      </ComboBox>
+      <TextBlock Grid.Row="2" Text="SSH Host:" VerticalAlignment="Center" Margin="0,12,0,0"/>
+      <TextBox x:Name="HostBox" Grid.Row="2" Grid.Column="1" Margin="0,12,0,0" IsEnabled="False"/>
+      <TextBlock Grid.Row="3" Text="SSH Username:" VerticalAlignment="Center" Margin="0,12,0,0"/>
+      <TextBox x:Name="UsernameBox" Grid.Row="3" Grid.Column="1" Margin="0,12,0,0" IsEnabled="False"/>
+      <TextBlock Grid.Row="4" Text="SSH Port:" VerticalAlignment="Center" Margin="0,12,0,0"/>
+      <TextBox x:Name="SshPortBox" Grid.Row="4" Grid.Column="1" Margin="0,12,0,0" Text="22" IsEnabled="False"/>
+      <TextBlock Grid.Row="5" Text="Password / key passphrase:" VerticalAlignment="Center" Margin="0,12,0,0"/>
+      <PasswordBox x:Name="PasswordBox" Grid.Row="5" Grid.Column="1" Margin="0,12,0,0" IsEnabled="False"/>
+      <TextBlock Grid.Row="6" Text="Private key (optional):" VerticalAlignment="Center" Margin="0,12,0,0"/>
+      <TextBox x:Name="PrivateKeyBox" Grid.Row="6" Grid.Column="1" Margin="0,12,0,0" IsEnabled="False"/>
+      <Button x:Name="BrowseKeyButton" Grid.Row="6" Grid.Column="2" Content="Browse" Margin="10,12,0,0" IsEnabled="False" Click="BrowseKey"/>
+      <TextBlock Grid.Row="7" Text="Log file:" VerticalAlignment="Center" Margin="0,12,0,0"/>
+      <TextBox x:Name="LogPathBox" Grid.Row="7" Grid.Column="1" Margin="0,12,0,0"/>
+      <Button Grid.Row="7" Grid.Column="2" Content="Browse" Margin="10,12,0,0" Click="BrowseLog"/>
+      <CheckBox x:Name="TimestampBox" Grid.Row="8" Grid.ColumnSpan="3" Content="Add timestamp to each log line" IsChecked="True" Margin="0,14,0,0"/>
+    </Grid>
+    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
+      <Button x:Name="ConnectButton" Content="Connect" Width="96" Margin="0,0,10,0" Click="ConnectClicked"/>
+      <Button Content="Cancel" Width="96" Click="CancelClicked"/>
+    </StackPanel>
+  </Grid>
+</Window>

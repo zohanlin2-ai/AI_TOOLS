@@ -6,6 +6,12 @@ Develop a Windows desktop application that provides Tera Term-like COM port and 
 
 Both the user and AI can read device output and send commands for verification through the same connection. The terminal view and log file must faithfully show only the data actually returned by the device.
 
+## Language
+
+- README files, user-interface text, command-line output, and any application-generated log content use English.
+- Device output is written and displayed unchanged. The application does not translate, localize, or otherwise alter it.
+- When timestamps are enabled, they use the invariant `yyyy-MM-dd HH:mm:ss.fff` format.
+
 ## First Release Scope
 
 - Support Serial (COM port) and SSH connections.
@@ -14,6 +20,21 @@ Both the user and AI can read device output and send commands for verification t
 - Let AI use a simple local CLI to create connections, read recent logs, send commands, and show or hide the terminal UI.
 - Connections, log writing, and AI operations must continue while the UI is hidden.
 - Support only one active session in the first release.
+
+## Implementation Status
+
+Implemented and build-verified:
+
+- WPF connection settings window.
+- Serial (COM Port) connection, device-output reception, command sending, and disconnecting.
+- Terminal window that displays only device output; no local command echo or source labels are injected.
+- Log writer that writes only device output and optionally prefixes each completed logical line with a timestamp.
+- Closing the terminal window hides it; the system tray menu can show it again or disconnect the session.
+- SSH interactive-shell sessions with password or private-key authentication.
+- Local Named Pipe control service and the `aiterm` CLI for background connection, command input, recent-log retrieval, and UI visibility.
+- Terminal buffer handling for device echo, cursor movement, and common control sequences.
+
+Still requires real-device validation. Full ANSI terminal emulation is intentionally not included; output remains a plain text view of the device stream.
 
 ## Technology Choices
 
@@ -42,7 +63,7 @@ The Terminal Session is the only component that owns the Serial or SSH connectio
 - COM port selection and rescan.
 - Baud rate; default: 115200.
 - Data bits, parity, stop bits, and flow control.
-- Serial line ending; default: CRLF.
+- Serial line ending; default: CR (the conventional Enter sequence for an interactive UART shell).
 
 ### SSH Settings
 
@@ -78,17 +99,18 @@ Reached end of play list.
 - Do not locally echo commands.
 - Do not separately display commands sent by the user or AI.
 - If the device echoes commands itself, that output naturally appears in the terminal and log; the application does not handle it separately.
-- Support auto-scroll; pause following when the user reads older output, and indicate that new output is available.
-- Support copy, search, and user command history.
-- The command input at the bottom sends commands with Enter or the Send button.
+- Automatically follow the latest device output while preserving a visible cursor position.
+- Support selecting and copying terminal text.
+- Right-click pastes Unicode clipboard text directly to the active terminal session. Pasted line breaks use the connection's configured line ending.
+- Type directly in the Terminal window. Enter sends the configured connection line ending.
 
 Closing the terminal window hides the UI rather than interrupting the session. The terminal can be shown again through the system-tray icon or CLI.
 
 ## Log Rules
 
 - Log files record only output received from the device.
-- Do not record commands sent by the user.
-- Do not record commands sent by AI.
+- Do not separately add commands sent by the user or AI to the log.
+- If the device echoes a command, that echoed data is device output and is retained unchanged in the log.
 - The timestamp option affects only the log file, not the terminal UI.
 - Timestamps are enabled by default. When disabled, the log retains the device's original text.
 
@@ -107,20 +129,24 @@ Data received through Serial and SSH is not guaranteed to arrive one line at a t
 Do not use MCP. AI interacts with the application through a local CLI, for example:
 
 ```powershell
-aiterm connect serial --port COM3 --baud 115200 --log C:\logs\dut.log
-aiterm connect ssh --host 192.168.1.10 --user root --password xxx --log C:\logs\dut.log
+aiterm connect --type serial --port COM3 --baud 115200 --log C:\logs\dut.log
+aiterm connect --type ssh --host 192.168.1.10 --ssh-port 22 --user root --password xxx --log C:\logs\dut.log
 
 aiterm status
 aiterm log --tail 100
-aiterm send "uname -a"
+aiterm send --command "uname -a"
+aiterm input --text "partial input"
+aiterm key --name enter
 
-aiterm ui show
-aiterm ui hide
+aiterm ui --action show
+aiterm ui --action hide
 
 aiterm disconnect
 ```
 
 The CLI passes requests to the background Terminal Session. AI can create connections, read logs, and enter commands while the terminal UI is hidden.
+
+Use `aiterm input` only for raw interactive input. Do not pass secrets through `aiterm send`, because the remote device may echo the complete command into its output and log.
 
 Operational risk from AI actions is handled by the conversation rules between AI and the user. The first release does not include MCP, command analysis, command approval, or AI identity features.
 
@@ -128,7 +154,7 @@ Operational risk from AI actions is handled by the conversation rules between AI
 
 1. Create the .NET 8 WPF project and connection-settings UI.
 2. Implement the Serial session: connect, receive, send commands, write logs, and disconnect.
-3. Implement the terminal UI: real-time output, command entry, auto-scroll, search, and hiding.
+3. Implement the terminal UI: real-time output, direct keyboard input, auto-scroll, and hiding.
 4. Implement the SSH interactive shell: connect, receive, send commands, and provide basic ANSI support.
 5. Extract a shared session interface to unify Serial and SSH behavior.
 6. Separate the session from the UI; add background persistence and system-tray support.
