@@ -1,0 +1,5 @@
+# Never commit these local PDF documents.
+/Schematic_diagram/nRF54L15_DK_HW_User_Guide_v0.9.1.pdf
+/Schematic_diagram/nRF54L15_DK_HW_User_Guide_v1.0.0 (1).pdf
+/Schematic_diagram/test/5564_0B.pdf
+/Schematic_diagram/test/5564_0B.private-analysis.md
