@@ -101,7 +101,7 @@ Reached end of play list.
 - If the device echoes commands itself, that output naturally appears in the terminal and log; the application does not handle it separately.
 - Automatically follow the latest device output while preserving a visible cursor position.
 - Support selecting and copying terminal text.
-- Right-click pastes Unicode clipboard text directly to the active terminal session. Pasted line breaks use the connection's configured line ending.
+- Right-click copies selected terminal text only when the pointer is within that selected range. A right-click outside the selected range, or with no selection, pastes Unicode clipboard text directly to the active terminal session. Pasted line breaks use the connection's configured line ending.
 - Type directly in the Terminal window. Enter sends the configured connection line ending.
 
 Closing the terminal window hides the UI rather than interrupting the session. The terminal can be shown again through the system-tray icon or CLI.

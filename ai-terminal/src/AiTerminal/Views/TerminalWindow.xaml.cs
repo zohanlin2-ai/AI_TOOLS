@@ -11,6 +11,7 @@ public partial class TerminalWindow : Window
 {
     private readonly ITerminalSession _session;
     private bool _allowClose;
+    private bool _rightClickStartedInSelection;
     private readonly TerminalBuffer _terminalBuffer = new();
 
     public TerminalWindow(ITerminalSession session)
@@ -74,12 +75,25 @@ public partial class TerminalWindow : Window
         else if (TryGetTerminalSequence(e.Key, out var sequence)) { _ = WriteRawAsync(sequence); e.Handled = true; }
     }
 
+    private void TerminalRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        _rightClickStartedInSelection = IsPointerInSelection(e.GetPosition(OutputBox));
+        e.Handled = true;
+    }
+
     private async void TerminalRightButtonUp(object sender, MouseButtonEventArgs e)
     {
         e.Handled = true;
 
         try
         {
+            var selectedText = OutputBox.SelectedText;
+            if (_rightClickStartedInSelection && !string.IsNullOrEmpty(selectedText))
+            {
+                System.Windows.Clipboard.SetText(selectedText, System.Windows.TextDataFormat.UnicodeText);
+                return;
+            }
+
             if (!System.Windows.Clipboard.ContainsText(System.Windows.TextDataFormat.UnicodeText)) return;
 
             var text = System.Windows.Clipboard.GetText(System.Windows.TextDataFormat.UnicodeText);
@@ -92,6 +106,19 @@ public partial class TerminalWindow : Window
         {
             MessageBox.Show(ex.Message, "Paste failed", MessageBoxButton.OK, MessageBoxImage.Error);
         }
+        finally
+        {
+            _rightClickStartedInSelection = false;
+        }
+    }
+
+    private bool IsPointerInSelection(System.Windows.Point point)
+    {
+        if (OutputBox.SelectionLength == 0) return false;
+
+        var characterIndex = OutputBox.GetCharacterIndexFromPoint(point, snapToText: false);
+        return characterIndex >= OutputBox.SelectionStart &&
+               characterIndex < OutputBox.SelectionStart + OutputBox.SelectionLength;
     }
 
     private string NormalizePastedText(string text) =>

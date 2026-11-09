@@ -15,6 +15,8 @@ All notable changes and test findings are documented in this file.
 - Serial Enter now defaults to a single CR rather than CRLF. This avoids a residual LF being consumed as an empty response by interactive shell commands such as `read` on the validated target UART.
 - Added `aiterm input --text <value>` for raw text input without an automatic line ending. It allows a background controller to supply input to an interactive, no-echo prompt and then send Enter explicitly with `aiterm key --name enter`.
 - Right-click paste in the Terminal window. Unicode clipboard text is sent directly to the active session, and pasted line breaks are normalized to the configured connection line ending.
+- Context-sensitive right-click handling: selected terminal text is copied to the Unicode clipboard; when no text is selected, right-click continues to paste clipboard text into the active session.
+- Right-click copy now requires the pointer to be inside the selected text range. Right-clicking outside an existing selection pastes instead, matching terminal-style mouse behaviour.
 
 ### Validated
 
