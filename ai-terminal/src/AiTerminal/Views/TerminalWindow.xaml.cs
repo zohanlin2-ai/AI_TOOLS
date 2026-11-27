@@ -49,8 +49,7 @@ public partial class TerminalWindow : Window
 
     private void RefreshOutput()
     {
-        if (OutputBox.SelectionLength != 0 ||
-            (OutputBox.IsMouseCaptureWithin && Mouse.LeftButton == MouseButtonState.Pressed)) return;
+        if (IsSelectingOutput()) return;
 
         string text;
         lock (_terminalBuffer)
@@ -62,6 +61,20 @@ public partial class TerminalWindow : Window
 
         if (string.Equals(OutputBox.Text, text, StringComparison.Ordinal)) return;
         OutputBox.Text = text;
+        _ = Dispatcher.InvokeAsync(FollowLatestOutput, DispatcherPriority.Loaded);
+    }
+
+    private bool IsSelectingOutput() =>
+        OutputBox.SelectionLength != 0 ||
+        (OutputBox.IsMouseCaptureWithin && Mouse.LeftButton == MouseButtonState.Pressed);
+
+    private void FollowLatestOutput()
+    {
+        if (!IsVisible || IsSelectingOutput()) return;
+
+        // Replacing the text resets WPF's caret. Keep it at the end so typing
+        // cannot bring the start of the scrollback back into view.
+        OutputBox.CaretIndex = OutputBox.Text.Length;
         OutputBox.ScrollToEnd();
     }
 
@@ -182,7 +195,7 @@ public partial class TerminalWindow : Window
 
     private async Task WriteRawAsync(string text)
     {
-        if (OutputBox.SelectionLength != 0) OutputBox.Select(OutputBox.SelectionStart, 0);
+        if (OutputBox.SelectionLength != 0) OutputBox.CaretIndex = OutputBox.Text.Length;
         try { await _session.WriteRawAsync(text); }
         catch (Exception ex) { _ = Dispatcher.BeginInvoke(() => MessageBox.Show(ex.Message, "Send failed", MessageBoxButton.OK, MessageBoxImage.Error)); }
     }

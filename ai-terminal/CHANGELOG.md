@@ -28,6 +28,8 @@ All notable changes and test findings are documented in this file.
 
 ### Fixed
 
+- Fixed a scroll regression where typing could jump to the top of the terminal after batched output replaced the text. After layout, the view anchors the text caret at the end and follows the latest output.
+
 - Long command lines now wrap on the 80-column terminal grid, with cursor positioning and line erasure handled across wrapped rows. Right-click copying removes display-only line breaks. Serial writes are serialized, and Serial and SSH decoding preserve UTF-8 characters split across reads.
 - Sustained device output no longer queues a full redraw per read. The view batches refreshes and retains the latest 1,000 display lines, while device reads and log writes run off the UI thread. The log file still retains the full received output.
 
