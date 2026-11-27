@@ -16,7 +16,7 @@ public partial class App : System.Windows.Application
     private TerminalWindow? _terminalWindow;
     private ITerminalSession? _session;
     private LocalControlServer? _controlServer;
-    private readonly List<string> _recentOutput = [];
+    private readonly Queue<string> _recentOutput = new();
     private Mutex? _instanceMutex;
     private EventWaitHandle? _showWindowEvent;
     private RegisteredWaitHandle? _showWindowRegistration;
@@ -179,17 +179,27 @@ public partial class App : System.Windows.Application
     private async Task ConnectCoreAsync(ConnectionOptions options)
     {
         await DisconnectAsync();
-        _recentOutput.Clear();
+        lock (_recentOutput) _recentOutput.Clear();
         _session = options.Kind == ConnectionKind.Serial ? new SerialTerminalSession(options) : new SshTerminalSession(options);
         _session.OutputReceived += (_, text) =>
         {
             lock (_recentOutput)
             {
-                _recentOutput.Add(text);
-                while (_recentOutput.Count > 5000) _recentOutput.RemoveAt(0);
+                _recentOutput.Enqueue(text);
+                if (_recentOutput.Count > 5000) _recentOutput.Dequeue();
             }
         };
-        await _session.ConnectAsync();
+        try
+        {
+            EnsureTerminalWindow();
+            await _session.ConnectAsync();
+            if (_terminalWindow is not null) _terminalWindow.Title = "AI Terminal - Connected";
+        }
+        catch
+        {
+            await DisconnectAsync();
+            throw;
+        }
     }
 
     private async Task<ControlResponse> HandleControlRequestAsync(ControlRequest request)

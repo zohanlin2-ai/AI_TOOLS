@@ -28,6 +28,9 @@ All notable changes and test findings are documented in this file.
 
 ### Fixed
 
+- Long command lines now wrap on the 80-column terminal grid, with cursor positioning and line erasure handled across wrapped rows. Right-click copying removes display-only line breaks. Serial writes are serialized, and Serial and SSH decoding preserve UTF-8 characters split across reads.
+- Sustained device output no longer queues a full redraw per read. The view batches refreshes and retains the latest 1,000 display lines, while device reads and log writes run off the UI thread. The log file still retains the full received output.
+
 - **COM port reported as busy during testing:** Multiple manually launched AI Terminal instances could retain an active Serial session. Closing duplicate AI Terminal processes releases the port; run only one instance per device session.
 - **ANSI escape sequences were visible as text:** Device output such as `ESC[1;31m` appeared literally in the terminal view. The visual terminal now filters ANSI CSI control sequences. The raw device data remains unchanged in the log file.
 - **Typed commands were invisible until Enter:** The terminal now renders locally typed characters immediately, matching conventional terminal interaction. Local visual echo is not written to the log file.

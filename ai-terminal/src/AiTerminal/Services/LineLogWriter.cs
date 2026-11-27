@@ -15,7 +15,8 @@ public sealed class LineLogWriter : IAsyncDisposable
     public LineLogWriter(string path, bool timestamp)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
-        _writer = new StreamWriter(new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.Read), new UTF8Encoding(false));
+        var stream = new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.Read, 4096, useAsync: true);
+        _writer = new StreamWriter(stream, new UTF8Encoding(false));
         _timestamp = timestamp;
     }
 
@@ -31,17 +32,24 @@ public sealed class LineLogWriter : IAsyncDisposable
                 return;
             }
 
-            foreach (var character in text)
+            var start = 0;
+            StringBuilder? completedLines = null;
+            for (var end = text.IndexOf('\n'); end >= 0; end = text.IndexOf('\n', start))
             {
-                _pendingLine.Append(character);
-                if (character == '\n')
-                {
-                    var timestamp = DateTimeOffset.Now.ToString("yyyy-MM-dd HH:mm:ss.fff ", CultureInfo.InvariantCulture);
-                    await _writer.WriteAsync(timestamp + _pendingLine);
-                    _pendingLine.Clear();
-                }
+                completedLines ??= new StringBuilder();
+                completedLines.Append(DateTimeOffset.Now.ToString("yyyy-MM-dd HH:mm:ss.fff ", CultureInfo.InvariantCulture));
+                completedLines.Append(_pendingLine);
+                completedLines.Append(text, start, end - start + 1);
+                _pendingLine.Clear();
+                start = end + 1;
             }
-            await _writer.FlushAsync(cancellationToken);
+
+            _pendingLine.Append(text, start, text.Length - start);
+            if (completedLines is not null)
+            {
+                await _writer.WriteAsync(completedLines.ToString());
+                await _writer.FlushAsync(cancellationToken);
+            }
         }
         finally
         {

@@ -43,7 +43,7 @@ public sealed class SshTerminalSession : ITerminalSession
         _client = new SshClient(connectionInfo);
         _client.Connect();
         _shell = _client.CreateShellStream("xterm", 80, 24, 0, 0, 4096);
-        _readTask = ReadLoopAsync(_cancellation.Token);
+        _readTask = Task.Run(() => ReadLoopAsync(_cancellation.Token));
         return Task.CompletedTask;
     }
 
@@ -61,18 +61,32 @@ public sealed class SshTerminalSession : ITerminalSession
     private async Task ReadLoopAsync(CancellationToken cancellationToken)
     {
         var buffer = new byte[4096];
+        var decoder = Encoding.UTF8.GetDecoder();
+        var characters = new char[Encoding.UTF8.GetMaxCharCount(buffer.Length)];
         try
         {
             while (!cancellationToken.IsCancellationRequested && _shell is not null && IsConnected)
             {
                 var count = await _shell.ReadAsync(buffer, cancellationToken);
                 if (count == 0) break;
-                var text = Encoding.UTF8.GetString(buffer, 0, count);
-                await _logWriter.WriteDeviceOutputAsync(text, cancellationToken);
+                var decoded = decoder.GetChars(buffer.AsSpan(0, count), characters, flush: false);
+                if (decoded == 0) continue;
+                var text = new string(characters, 0, decoded);
+                await _logWriter.WriteDeviceOutputAsync(text);
                 OutputReceived?.Invoke(this, text);
             }
         }
         catch (OperationCanceledException) { }
+        catch (System.IO.IOException) when (cancellationToken.IsCancellationRequested) { }
+        catch (ObjectDisposedException) when (cancellationToken.IsCancellationRequested) { }
+
+        var remaining = decoder.GetChars(ReadOnlySpan<byte>.Empty, characters, flush: true);
+        if (remaining > 0)
+        {
+            var text = new string(characters, 0, remaining);
+            await _logWriter.WriteDeviceOutputAsync(text);
+            OutputReceived?.Invoke(this, text);
+        }
     }
 
     public async ValueTask DisposeAsync()

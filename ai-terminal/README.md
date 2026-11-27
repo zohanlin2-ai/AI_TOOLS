@@ -99,8 +99,9 @@ Reached end of play list.
 - Do not locally echo commands.
 - Do not separately display commands sent by the user or AI.
 - If the device echoes commands itself, that output naturally appears in the terminal and log; the application does not handle it separately.
-- Automatically follow the latest device output while preserving a visible cursor position.
-- Support selecting and copying terminal text.
+- Automatically follow the latest device output with a visible cursor. The view retains up to 1,000 display lines; the session log file keeps the full device output.
+- Support selecting and copying terminal text. Screen refresh is paused while text is selected and resumes when the selection is cleared.
+- The terminal uses an 80-column grid for line wrapping and cursor movement. Right-click copying rejoins soft-wrapped lines and keeps line breaks received from the device.
 - Right-click copies selected terminal text only when the pointer is within that selected range. A right-click outside the selected range, or with no selection, pastes Unicode clipboard text directly to the active terminal session. Pasted line breaks use the connection's configured line ending.
 - Type directly in the Terminal window. Enter sends the configured connection line ending.
 

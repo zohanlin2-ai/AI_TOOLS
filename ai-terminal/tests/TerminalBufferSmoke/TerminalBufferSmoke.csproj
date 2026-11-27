@@ -7,5 +7,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\..\src\AiTerminal\Views\TerminalBuffer.cs" Link="TerminalBuffer.cs" />
+    <Compile Include="..\..\src\AiTerminal\Services\LineLogWriter.cs" Link="LineLogWriter.cs" />
   </ItemGroup>
 </Project>

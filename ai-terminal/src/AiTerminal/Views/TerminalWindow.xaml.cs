@@ -13,11 +13,24 @@ public partial class TerminalWindow : Window
     private bool _allowClose;
     private bool _rightClickStartedInSelection;
     private readonly TerminalBuffer _terminalBuffer = new();
+    private readonly List<int> _displayedSoftBreaks = [];
+    private readonly DispatcherTimer _refreshTimer;
+    private bool _displayDirty;
 
     public TerminalWindow(ITerminalSession session)
     {
         InitializeComponent();
         _session = session;
+        _refreshTimer = new DispatcherTimer(DispatcherPriority.Background, Dispatcher)
+        {
+            Interval = TimeSpan.FromMilliseconds(67),
+        };
+        _refreshTimer.Tick += (_, _) => RefreshOutput();
+        IsVisibleChanged += (_, _) =>
+        {
+            if (IsVisible) _refreshTimer.Start();
+            else _refreshTimer.Stop();
+        };
         _session.OutputReceived += OnOutputReceived;
         Title = $"AI Terminal - {(_session.IsConnected ? "Connected" : "Disconnected")}";
     }
@@ -27,16 +40,36 @@ public partial class TerminalWindow : Window
 
     private void OnOutputReceived(object? sender, string text)
     {
-        Dispatcher.BeginInvoke(() =>
+        lock (_terminalBuffer)
         {
             _terminalBuffer.Write(text);
-            OutputBox.Text = _terminalBuffer.Render(showCursor: true);
-            _ = Dispatcher.BeginInvoke(DispatcherPriority.Background, () =>
-            {
-                OutputBox.CaretIndex = OutputBox.Text.Length;
-                OutputBox.ScrollToEnd();
-            });
-        });
+            _displayDirty = true;
+        }
+    }
+
+    private void RefreshOutput()
+    {
+        if (OutputBox.SelectionLength != 0 ||
+            (OutputBox.IsMouseCaptureWithin && Mouse.LeftButton == MouseButtonState.Pressed)) return;
+
+        string text;
+        lock (_terminalBuffer)
+        {
+            if (!_displayDirty) return;
+            text = _terminalBuffer.Render(showCursor: true, _displayedSoftBreaks);
+            _displayDirty = false;
+        }
+
+        if (string.Equals(OutputBox.Text, text, StringComparison.Ordinal)) return;
+        OutputBox.Text = text;
+        OutputBox.ScrollToEnd();
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        _refreshTimer.Stop();
+        _session.OutputReceived -= OnOutputReceived;
+        base.OnClosed(e);
     }
 
     private void TerminalTextInput(object sender, TextCompositionEventArgs e)
@@ -87,10 +120,11 @@ public partial class TerminalWindow : Window
 
         try
         {
-            var selectedText = OutputBox.SelectedText;
-            if (_rightClickStartedInSelection && !string.IsNullOrEmpty(selectedText))
+            if (_rightClickStartedInSelection && OutputBox.SelectionLength != 0)
             {
-                System.Windows.Clipboard.SetText(selectedText, System.Windows.TextDataFormat.UnicodeText);
+                var selectedText = GetSelectedText();
+                if (selectedText.Length != 0)
+                    System.Windows.Clipboard.SetText(selectedText, System.Windows.TextDataFormat.UnicodeText);
                 return;
             }
 
@@ -121,6 +155,26 @@ public partial class TerminalWindow : Window
                characterIndex < OutputBox.SelectionStart + OutputBox.SelectionLength;
     }
 
+    private string GetSelectedText()
+    {
+        var text = OutputBox.SelectedText;
+        var selectionStart = OutputBox.SelectionStart;
+        var lineBreakLength = Environment.NewLine.Length;
+        var copied = new StringBuilder(text.Length);
+        var start = 0;
+
+        foreach (var offset in _displayedSoftBreaks)
+        {
+            var index = offset - selectionStart;
+            if (index < 0) continue;
+            if (index + lineBreakLength > text.Length) break;
+            copied.Append(text, start, index - start);
+            start = index + lineBreakLength;
+        }
+
+        return copied.Append(text, start, text.Length - start).ToString();
+    }
+
     private string NormalizePastedText(string text) =>
         text.Replace("\r\n", "\n", StringComparison.Ordinal)
             .Replace('\r', '\n')
@@ -128,6 +182,7 @@ public partial class TerminalWindow : Window
 
     private async Task WriteRawAsync(string text)
     {
+        if (OutputBox.SelectionLength != 0) OutputBox.Select(OutputBox.SelectionStart, 0);
         try { await _session.WriteRawAsync(text); }
         catch (Exception ex) { _ = Dispatcher.BeginInvoke(() => MessageBox.Show(ex.Message, "Send failed", MessageBoxButton.OK, MessageBoxImage.Error)); }
     }
